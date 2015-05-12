@@ -2,6 +2,10 @@
 
 namespace Model;
 
+use DateTime;
+use Eluceo\iCal\Component\Calendar;
+use Eluceo\iCal\Component\Event;
+
 /**
  * Task Filter
  *
@@ -110,8 +114,14 @@ class TaskFilter extends Base
 
     public function filterByDueDateRange($start, $end)
     {
-        $this->query->gte('date_due', $this->dateParser->getTimestampFromIsoFormat($start));
-        $this->query->lte('date_due', $this->dateParser->getTimestampFromIsoFormat($end));
+        if (is_numeric($start)) {
+            $this->query->gte('date_due', $start);
+            $this->query->lte('date_due', $end);
+        }
+        else {
+            $this->query->gte('date_due', $this->dateParser->getTimestampFromIsoFormat($start));
+            $this->query->lte('date_due', $this->dateParser->getTimestampFromIsoFormat($end));
+        }
 
         return $this;
     }
@@ -155,5 +165,27 @@ class TaskFilter extends Base
         }
 
         return $events;
+    }
+
+    public function toIcal()
+    {
+        $vCalendar = new Calendar('Kanboard');
+
+        foreach ($this->query->findAll() as $task) {
+
+            $dueDate = new DateTime;
+            $dueDate->setTimestamp($task['date_due']);
+
+            $vEvent = new Event;
+            $vEvent->setDtStart($dueDate);
+            $vEvent->setDtEnd($dueDate);
+            $vEvent->setNoTime(true);
+            $vEvent->setUseTimezone(true);
+            $vEvent->setSummary(t('#%d', $task['id']).' '.$task['title']);
+
+            $vCalendar->addComponent($vEvent);
+        }
+
+        return $vCalendar->render();
     }
 }
